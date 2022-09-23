@@ -83,6 +83,74 @@ func (r *CityReader) Lookup(ip net.IP) (*CityResult, error) {
 	return result, nil
 }
 
+func (r *CityReader) Traverse(offset uint) (*CityResult, uint, error) {
+	dataType, size, offset, err := readControl(r.decoderBuffer, offset)
+	if err != nil {
+		return nil, offset, err
+	}
+	if dataType != dataTypeMap {
+		return nil, offset, errors.New("invalid City type: " + strconv.Itoa(int(dataType)))
+	}
+	var key []byte
+	result := &CityResult{}
+	for i := uint(0); i < size; i++ {
+		key, offset, err = readMapKey(r.decoderBuffer, offset)
+		if err != nil {
+			return nil, offset, err
+		}
+		switch b2s(key) {
+		case "city":
+			offset, err = readCity(&result.City, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "continent":
+			offset, err = readContinent(&result.Continent, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "country":
+			offset, err = readCountry(&result.Country, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "location":
+			offset, err = readLocation(&result.Location, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "postal":
+			offset, err = readPostal(&result.Postal, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "registered_country":
+			offset, err = readCountry(&result.RegisteredCountry, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "represented_country":
+			offset, err = readCountry(&result.RepresentedCountry, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "subdivisions":
+			result.Subdivisions, offset, err = readSubdivisions(r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		case "traits":
+			offset, err = readTraits(&result.Traits, r.decoderBuffer, offset)
+			if err != nil {
+				return nil, offset, err
+			}
+		default:
+			return nil, offset, errors.New("unknown City response key: " + string(key) + ", type: " + strconv.Itoa(int(dataType)))
+		}
+	}
+	return result, offset, nil
+}
+
 func NewCityReader(buffer []byte) (*CityReader, error) {
 	reader, err := newReader(buffer)
 	if err != nil {
